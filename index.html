@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Study Tracker — Focus & Watch</title>
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Pacifico&display=swap" rel="stylesheet">
+
+<!-- Chart.js for small chart -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+  :root{
+    --bg:#f3f6ff; --card:#fff; --muted:#6b7280; --accent:#2563eb; --accent-2:#7c3aed;
+    --glass: rgba(255,255,255,0.6);
+  }
+  [data-theme="dark"]{
+    --bg:#0b1020; --card:#0f1724; --muted:#9aa4b2; --accent:#60a5fa; --accent-2:#c084fc; --glass: rgba(255,255,255,0.03);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,var(--bg) 0%, #ffffff 100%);color:var(--muted);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:980px;margin:18px auto;padding:14px}
+  .header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+  .brand{display:flex;flex-direction:column}
+  .brand h1{margin:0;font-family:Pacifico;font-size:20px;color:var(--accent-2);line-height:1}
+  .brand p{margin:2px 0 0 0;font-size:12px;color:var(--muted)}
+  .controls{display:flex;gap:8px;align-items:center}
+  .btn{padding:8px 12px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid rgba(37,99,235,0.12)}
+  .card{background:var(--card);border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 6px 18px rgba(20,20,50,0.04)}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+  input[type=text], input[type=number], textarea, select{width:100%;padding:10px;border-radius:8px;border:1px solid #e6e9ef;background:transparent;color:inherit}
+  .grid{display:grid;grid-template-columns:1fr 360px;gap:12px}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}}
+  #player-area{min-height:220px;border-radius:10px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center}
+  .controls-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .list{max-height:220px;overflow:auto;padding:6px;border-radius:8px;border:1px dashed #e8eefc;background:linear-gradient(180deg,#fff,#fbfdff)}
+  .list-item{padding:8px;border-radius:8px;border:1px solid #f1f5fb;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .small{font-size:13px;color:var(--muted)}
+  .muted{color:var(--muted);font-size:12px}
+  .stat-row{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .stat{flex:1;padding:10px;border-radius:10px;background:linear-gradient(180deg,#fff,#fbfdff);text-align:center}
+  .ring{width:110px;height:110px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:conic-gradient(var(--accent) 0deg,var(--accent) var(--deg,0deg),#e6eefc var(--deg,0deg));box-shadow:0 6px 18px rgba(37,99,235,0.06)}
+  .ring .inner{width:84px;height:84px;border-radius:999px;background:var(--card);display:flex;align-items:center;justify-content:center;flex-direction:column}
+  .percent{font-weight:700;color:var(--accent-2)}
+  .note{font-size:12px;color:var(--muted);margin-top:8px}
+  .row{display:flex;gap:8px;align-items:center}
+  .pomodoro{display:flex;gap:6px;align-items:center}
+  .timer{font-weight:700}
+  .chart-wrap{height:140px}
+  footer{margin-top:12px;text-align:center;color:var(--muted);font-size:12px}
+  .toggle{display:inline-flex;align-items:center;gap:6px;padding:6px;border-radius:999px;background:var(--glass);border:1px solid rgba(0,0,0,0.04)}
+  .subject{width:150px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="header">
+    <div class="brand">
+      <h1>Study Tracker</h1>
+      <p class="muted">Track watched time, pomodoro, and sessions — local only</p>
+    </div>
+    <div class="controls">
+      <div class="toggle">
+        <label for="dark" class="muted">Dark</label>
+        <input id="dark" type="checkbox" />
+      </div>
+      <button class="btn" id="open-pom">Pomodoro</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <main>
+      <div class="card">
+        <label>Add YouTube video URL</label>
+        <div style="display:flex;gap:8px">
+          <input id="yt-url" type="text" placeholder="https://www.youtube.com/watch?v=..." />
+          <button class="btn" id="add-video">Add</button>
+        </div>
+        <div class="note">You can add multiple videos. Click a video to load it in player.</div>
+
+        <div style="margin-top:10px" class="list" id="video-list">
+          <!-- items -->
+          </div>
+          <div style="margin-top:12px">
+          <div id="player-area">
+            <div id="player-placeholder" style="color:#fff;font-size:15px">No video loaded</div>
+            <div id="player"></div>
+          </div>
+
+          <div class="controls-row">
+            <button class="btn" id="load-btn">Load selected</button>
+            <button class="btn ghost" id="clear-video">Remove</button>
+            <button class="btn ghost" id="export-csv">Export CSV</button>
+            <button class="btn ghost" id="export-json">Backup JSON</button>
+            <input id="import-file" type="file" accept="application/json" style="display:none" />
+            <button class="btn ghost" id="import-json">Restore JSON</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 8px 0">Session history</h3>
+        <div class="list" id="history">No sessions yet.</div>
+        <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:8px">
+          <button class="btn ghost" id="reset">Reset data</button>
+        </div>
+      </div>
+    </main>
+
+    <aside>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>Total studied</strong></div>
+          <div class="small" id="total-time-sm">0m</div>
+        </div>
+        <div class="stat-row" style="margin-top:10px">
+          <div class="stat">
+            <div class="small">Sessions</div>
+            <div id="total-sessions">0</div>
+          </div>
+          <div class="stat">
+            <div class="small">Today</div>
+            <div id="today-time">0m</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+          <div class="ring" id="ring" style="--deg:0deg"><div class="inner"><div class="percent" id="percent">0%</div><div class="muted" id="time-text">0m</div></div></div>
+          <div style="flex:1">
+            <label>Study target (hours)</label>
+            <input id="target-hours" type="number" min="0.1" step="0.1" value="5" />
+            <div class="note">Data stored locally. Export to back up.</div>
+          </div>
+        </div>
+  </div>
+  <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>Quick actions</strong></div>
+          <div class="small">Add minutes</div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button class="btn ghost" id="jump-10">+10m</button>
+          <button class="btn ghost" id="jump-30">+30m</button>
+        </div>
+        <div style="margin-top:12px">
+          <div><strong>Pomodoro</strong></div>
+          <div class="pomodoro" style="margin-top:6px">
+            <div class="timer" id="pom-timer">25:00</div>
+            <div>
+              <select id="pom-mode"><option value="25-5">25/5</option><option value="50-10">50/10</option></select>
+            </div>
+            <div><button class="btn" id="pom-start">Start</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>Weekly stats</strong></div>
+          <div class="small">Last 7 days</div>
+        </div>
+        <div class="chart-wrap" style="margin-top:10px"><canvas id="weekChart"></canvas></div>
+      </div>
+    </aside>
+  </div>
+
+  <footer>Made with focus • Data stored locally • Want sync or teacher dashboard? Ask me.</footer>
+</div>
+
+<!-- YouTube -->
+<script src="https://www.youtube.com/iframe_api"></script>
+
+<script>
+  /* Phase 1 upgraded tracker
+ - multiple videos support
+ - dark mode toggle
+ - pomodoro timer
+ - session notes
+ - CSV export + JSON backup
+ - small weekly chart (Chart.js)
+ - localStorage persistence
+*/
+const STORAGE_KEY = 'study-tracker-v2';
+let data = null;
+let player = null;
+let currentVideo = null;
+let lastPlayerTime = 0;
+let pollInterval = null;
+let chart = null;
+
+function loadStorage(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(!raw) return {videos:[], sessions:[], totals:{seconds:0}, lastId:0};
+  try{return JSON.parse(raw)}catch(e){return {videos:[], sessions:[], totals:{seconds:0}, lastId:0}}
+}
+function saveStorage(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); updateUI(); }
+
+data = loadStorage();
+
+// -- UI helpers
+function el(id){ return document.getElementById(id); }
+
+function secondsToHuman(s){
+  if(!s) return '0m';
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60);
+  return h? (h+'h '+m+'m') : (m+'m');
+}
+
+function refreshVideoList(){
+  const list = el('video-list'); list.innerHTML='';
+  if(!data.videos.length){ list.innerHTML='<div class="small muted">No videos added</div>'; return; }
+  data.videos.forEach((v,idx)=>{
+    const d=document.createElement('div'); d.className='list-item';
+    d.innerHTML = `<div style="flex:1"><div style="font-weight:600">${v.title||v.id}</div><div class="small">${v.url}</div></div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <button class="btn ghost" data-idx="${idx}" onclick="loadVideoIndex(${idx})">Load</button>
+        <button class="btn ghost" data-idx="${idx}" onclick="removeVideo(${idx})">Delete</button>
+      </div>`;
+    list.appendChild(d);
+  });
+}
+
+function refreshHistory(){
+  const h = el('history'); h.innerHTML='';
+  if(!data.sessions.length){ h.innerHTML='<div class="small muted">No sessions yet.</div>'; return; }
+  data.sessions.slice().forEach(s=>{
+    const d=document.createElement('div'); d.className='list-item';
+    d.innerHTML = `<div style="flex:1"><div style="font-weight:600">${secondsToHuman(s.durationSeconds)} ${s.subject? '• '+s.subject : ''}</div><div class="small">${s.source}${s.videoId? ' • '+s.videoId : ''}${s.note? ' • '+s.note : ''}</div></div>
+      <div style="text-align:right"><div class="small">${new Date(s.ts).toLocaleString()}</div><div style="margin-top:6px"><button class="btn ghost" onclick="deleteSession(${s.id})">Delete</button></div></div>`;
+    h.appendChild(d);
+  });
+}
+
+function updateStats(){
+  const total = data.totals.seconds || 0;
+  const targetHours = Number(el('target-hours').value) || 1;
+  const pct = Math.min(100, Math.round(total/(targetHours*3600)*100));
+  el('ring').style.setProperty('--deg', Math.round(pct*3.6)+'deg');
+  el('percent').innerText = pct+'%';
+  el('time-text').innerText = secondsToHuman(total);
+  el('total-time-sm').innerText = secondsToHuman(total);
+  el('total-sessions').innerText = data.sessions.length || 0;
+  // today
+  const today = new Date().toISOString().slice(0,10);
+  let todaySeconds=0;
+  data.sessions.forEach(s=>{ if(s.ts.slice(0,10)===today) todaySeconds+=s.durationSeconds; });
+  el('today-time').innerText = Math.round(todaySeconds/60)+'m';
+}
+
+function updateUI(){
+  refreshVideoList();
+  refreshHistory();
+  updateStats();
+  updateChart();
+}
+
+// -- add/remove videos
+function extractVideoId(url){
+  try{ const u=new URL(url); if(u.hostname.includes('youtube.com')) return u.searchParams.get('v'); if(u.hostname.includes('youtu.be')) return u.pathname.slice(1); }
+  catch(e){}
+  const m=url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/); return m? m[1] : null;
+}
+
+function addVideo(){
+  const url = el('yt-url').value.trim();
+  if(!url){ alert('Paste a YouTube link'); return; }
+  const id = extractVideoId(url);
+  if(!id){ alert('Not a valid YouTube link'); return; }
+  const title = 'Video '+(data.videos.length+1);
+  data.videos.push({id, url, title});
+  saveStorage();
+  el('yt-url').value='';
+}
+
+function removeVideo(idx){
+  if(!confirm('Remove this video?')) return;
+  if(data.videos[idx] && currentVideo && data.videos[idx].id === currentVideo.id){
+    // if currently loaded, unload player
+    if(player && player.destroy) player.destroy();
+    player=null; currentVideo=null; el('player-area').innerHTML = '<div id="player-placeholder" style="color:#fff">No video loaded</div>';
+    stopPolling();
+  }
+  data.videos.splice(idx,1); saveStorage();
+}
+
+function loadVideoIndex(idx){
+  const v = data.videos[idx];
+  if(!v) return;
+  createPlayer(v.id); currentVideo = v;
+  // highlight? not necessary
+}
+
+// -- YouTube player
+function onYouTubeIframeAPIReady(){}
+function createPlayer(videoId){
+  const area = el('player-area'); area.innerHTML=''; const pdiv=document.createElement('div'); pdiv.id='ytplayer'; area.appendChild(pdiv);
+  player = new YT.Player('ytplayer',{height:'240',width:'100%',videoId:videoId,playerVars:{enablejsapi:1,origin:location.origin,rel:0},events:{onStateChange:onPlayerStateChange}});
+  lastPlayerTime=0; startPolling();
+}
+
+function onPlayerStateChange(e){
+  if(e.data === YT.PlayerState.PLAYING) startPolling();
+  else if(e.data === YT.PlayerState.PAUSED || e.data===YT.PlayerState.ENDED) pollPlayer(true);
+}
+
+function startPolling(){ if(pollInterval) return; pollInterval = setInterval(()=>pollPlayer(false),1000); }
+function stopPolling(){ if(pollInterval){ clearInterval(pollInterval); pollInterval=null; } }
+
+function pollPlayer(force=false){
+  if(!player || !player.getCurrentTime) return;
+  try{
+    const t = player.getCurrentTime();
+    if(typeof t!=='number' || isNaN(t)) return;
+    if(lastPlayerTime===0){ lastPlayerTime = t; return; }
+    let delta = t - lastPlayerTime;
+    if(delta < 0) delta = 0;
+    if(delta > 12) delta = 12;
+    if(delta >= 0.5 || force){
+      const sec = Math.round(delta);
+      if(sec>0){
+        createSession(sec, 'video', currentVideo? currentVideo.id : null);
+      }
+      lastPlayerTime = t;
+    }
+  }catch(err){ console.error(err); }
+}
+
+// -- sessions
+function createSession(durationSeconds, source='manual', videoId=null, note=''){
+  const id = (data.lastId||0)+1; data.lastId = id;
+  const subject = prompt('Optional subject for this session (press Cancel to skip):','') || '';
+  const sessionNote = note || (prompt('Add a short note for this session (optional):','')||'');
+  const s = {id, durationSeconds, source, videoId, subject, note:sessionNote, ts:(new Date()).toISOString()};
+  data.sessions.unshift(s);
+  data.totals.seconds = (data.totals.seconds||0) + durationSeconds;
+  saveStorage();
+}
+
+function deleteSession(id){
+  data.sessions = data.sessions.filter(s=>s.id!==id);
+  data.totals.seconds = data.sessions.reduce((acc,s)=>acc + s.durationSeconds, 0);
+  saveStorage();
+}
+
+// quick adds
+function quickAdd(min, tag='quick'){ createSession(min*60, tag, null); }
+
+// export/import
+function exportCSV(){
+  if(!data.sessions.length){ alert('No sessions'); return; }
+  let csv = 'id,ts,source,videoId,subject,note,durationSeconds\\n';
+  for(const s of data.sessions.slice().reverse()){
+    csv += `${s.id},"${s.ts}",${s.source},${s.videoId||''},"${(s.subject||'')}","${(s.note||'')}",${s.durationSeconds}\\n`;
+  }
+  const blob = new Blob([csv], {type:'text/csv'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='study-sessions.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(data)], {type:'application/json'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='study-backup.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function importJSON(file){
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const parsed = JSON.parse(e.target.result);
+      if(confirm('This will replace local study data. Continue?')){
+        data = parsed;
+        saveStorage();
+      }
+    }catch(err){ alert('Invalid file'); }
+  };
+  reader.readAsText(file);
+}
+
+// chart
+function updateChart(){
+  const ctx = document.getElementById('weekChart');
+  if(!ctx) return;
+  const days = 7;
+  const labels = []; const values = [];
+  for(let i=days-1;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const key = d.toISOString().slice(0,10);
+    labels.push(d.toLocaleDateString(undefined,{weekday:'short'}));
+    let total=0;
+    data.sessions.forEach(s=>{ if(s.ts.slice(0,10)===key) total+=s.durationSeconds; });
+    values.push(Math.round(total/60)); // minutes
+  }
+  if(!chart){
+    chart = new Chart(ctx, {type:'bar',data:{labels, datasets:[{label:'Minutes',data:values,backgroundColor:getComputedStyle(document.documentElement).getPropertyValue('--accent')} ]}, options:{scales:{y:{beginAtZero:true}}}});
+  } else {
+    chart.data.labels = labels; chart.data.datasets[0].data = values; chart.update();
+  }
+}
+
+// UI wiring
+document.getElementById('add-video').addEventListener('click', addVideo);
+document.getElementById('load-btn').addEventListener('click', ()=>{
+  // if there is a currentVideo, ensure player exists
+  if(currentVideo) createPlayer(currentVideo.id);
+  else if(data.videos.length) createPlayer(data.videos[0].id), currentVideo = data.videos[0];
+  else alert('Add a video first');
+});
+document.getElementById('clear-video').addEventListener('click', ()=>{
+  if(player && player.destroy) player.destroy();
+  player=null; currentVideo=null; el('player-area').innerHTML='<div id="player-placeholder" style="color:#fff">No video loaded</div>'; stopPolling();
+});
+document.getElementById('export-csv').addEventListener('click', exportCSV);
+document.getElementById('export-json').addEventListener('click', exportJSON);
+document.getElementById('import-json').addEventListener('click', ()=>el('import-file').click());
+el('import-file').addEventListener('change', (ev)=>{ const f=ev.target.files[0]; if(f) importJSON(f); });
+document.getElementById('reset').addEventListener('click', ()=>{
+  if(!confirm('Reset all stored study data? This cannot be undone.')) return;
+  data = {videos:[], sessions:[], totals:{seconds:0}, lastId:0}; saveStorage();
+});
+
+// quick add
+document.getElementById('jump-10').addEventListener('click', ()=>quickAdd(10));
+document.getElementById('jump-30').addEventListener('click', ()=>quickAdd(30));
+
+el('target-hours').addEventListener('change', updateStats);
+
+// dark mode
+const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+if(prefersDark) document.documentElement.setAttribute('data-theme','dark'), el('dark').checked=true;
+el('dark').addEventListener('change',(e)=>{ if(e.target.checked) document.documentElement.setAttribute('data-theme','dark'); else document.documentElement.removeAttribute('data-theme'); });
+
+// pomodoro
+let pomInterval=null, pomRemaining=1500, pomRunning=false;
+function resetPomDefault(){ const mode = el('pom-mode').value; if(mode==='25-5') pomRemaining = 25*60; else pomRemaining = 50*60; el('pom-timer').innerText = formatTime(pomRemaining); }
+function formatTime(s){ const m = Math.floor(s/60).toString().padStart(2,'0'); const sec = (s%60).toString().padStart(2,'0'); return `${m}:${sec}`; }
+function tickPom(){ if(pomRemaining<=0){ clearInterval(pomInterval); pomRunning=false; el('pom-start').innerText='Start'; alert('Pomodoro finished!'); return; } pomRemaining--; el('pom-timer').innerText = formatTime(pomRemaining); }
+el('pom-start').addEventListener('click', ()=>{ if(pomRunning){ clearInterval(pomInterval); pomRunning=false; el('pom-start').innerText='Start'; return; } pomRunning=true; el('pom-start').innerText='Pause'; pomInterval = setInterval(tickPom, 1000); });
+el('pom-mode').addEventListener('change', resetPomDefault);
+document.getElementById('open-pom').addEventListener('click', ()=>{ window.scrollTo({top:document.body.scrollHeight, behavior:'smooth'}); });
+
+// import/remove video utils
+function removeVideoById(id){ const idx = data.videos.findIndex(v=>v.id===id); if(idx>=0) removeVideo(idx); }
+
+// on load
+updateUI();
+
+// helper: delete session exposed to window for inline onclick
+window.deleteSession = deleteSession;
+window.loadVideoIndex = loadVideoIndex;
+window.removeVideo = removeVideo;
+
+</script>
+</body>
+</html>
+  

@@ -337,14 +337,42 @@ function pollPlayer(force=false){
 
 // -- sessions
 function createSession(durationSeconds, source='manual', videoId=null, note=''){
-  const id = (data.lastId||0)+1; data.lastId = id;
-  const subject = prompt('Optional subject for this session (press Cancel to skip):','') || '';
-  const sessionNote = note || (prompt('Add a short note for this session (optional):','')||'');
-  const s = {id, durationSeconds, source, videoId, subject, note:sessionNote, ts:(new Date()).toISOString()};
+  const id = (data.lastId||0) + 1;
+  data.lastId = id;
+
+  // For automatic video tracking we DO NOT show blocking prompts.
+  // Only ask for subject/note when sessions are manual or quick (source !== 'video').
+  let subject = '';
+  let sessionNote = note || '';
+
+  if (source !== 'video') {
+    try {
+      const subRes = prompt('Optional subject for this session (press Cancel to skip):', '');
+      if (subRes !== null) subject = subRes;
+
+      const noteRes = prompt('Add a short note for this session (optional):', '');
+      if (noteRes !== null) sessionNote = sessionNote || noteRes;
+    } catch (e) {
+      // If browser blocks prompt() or throws, continue silently.
+      console.warn('Prompt blocked or error:', e);
+    }
+  }
+
+  const s = {
+    id,
+    durationSeconds,
+    source,
+    videoId,
+    subject,
+    note: sessionNote,
+    ts: (new Date()).toISOString()
+  };
+
+  // store session and update totals
   data.sessions.unshift(s);
-  data.totals.seconds = (data.totals.seconds||0) + durationSeconds;
+  data.totals.seconds = (data.totals.seconds || 0) + durationSeconds;
   saveStorage();
-}
+  }
 
 function deleteSession(id){
   data.sessions = data.sessions.filter(s=>s.id!==id);
